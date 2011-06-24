@@ -12,7 +12,7 @@
  * of files and save them into a target directory.
  *
  * Subclasses need only implement the _process() method to define what
- * actions should occurr.
+ * actions should occur.
  */
 abstract class ProcessFilesetTask extends Task
 {
