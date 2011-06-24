@@ -7,6 +7,8 @@
  * @license New BSD License
  */
 
+require_once dirname(__FILE__) . '/ProcessFilesetTask.php';
+
 /**
  * Defines a Phing task to compile {@link http://lesscss.org LESS} syntax to
  * valid CSS.
@@ -31,26 +33,8 @@
  * {@link http://leafo.net/lessphp/docs/#differences the documentation} for
  * details.
  */
-class LessCompilerTask extends Task
+class LessCompilerTask extends ProcessFilesetTask
 {
-
-    /**
-     * @var PhingFile
-     */
-    protected $_targetDir;
-
-    /**
-     * @var array
-     */
-    protected $_fileSets;
-
-    /**
-     * @return void
-     */
-    public function __construct()
-    {
-        $this->_fileSets = array ();
-    }
 
     /**
      * @return boolean
@@ -65,81 +49,27 @@ class LessCompilerTask extends Task
     }
 
     /**
-     * @return void
+     * Replaces the .less extension with .css
+     *
+     * @param string $file
      */
-    public function main()
+    protected function _calculateTarget($file)
     {
-        $this->_checkTargetDir();
-
-        /* @var $fileSet FileSet */
-        foreach ($this->_fileSets as $fileSet) {
-
-            $files = $fileSet->getDirectoryScanner($this->project)
-                ->getIncludedFiles();
-
-            foreach ($files as $file) {
-
-                $targetDir = new PhingFile($this->_targetDir, dirname($file));
-                if (!$targetDir->exists()) {
-                    $targetDir->mkdirs();
-                }
-                unset ($targetDir);
-
-                $source = new PhingFile(
-                    $fileSet->getDir($this->project),
-                    $file
-                );
-                $target = new PhingFile(
-                    $this->_targetDir,
-                    str_replace('.less', '.css', $file)
-                );
-
-                $this->log("Processing ${file}");
-                try {
-                    $lessc = new lessc($source->getAbsolutePath());
-                    file_put_contents(
-                        $target->getAbsolutePath(),
-                        $lessc->parse()
-                    );
-                } catch (Exception $e) {
-                    $this->log("Failed processing ${file}!", Project::MSG_ERR);
-                    $this->log($e->getMessage(), Project::MSG_DEBUG);
-                }
-
-            }
-
-        }
+        return new PhingFile(
+            $this->_targetDir,
+            str_replace('.less', '.css', $file)
+        );
     }
 
-    /**
-     * @return FileSet
-     */
-    public function createFileSet()
+    protected function _process($source, $target)
     {
-        $num = array_push($this->_fileSets, new FileSet);
-        return $this->_fileSets[$num - 1];
-    }
+        $lessc = new lessc($source->getAbsolutePath());
+        file_put_contents(
+            $target->getAbsolutePath(),
+            $lessc->parse()
+        );
 
-    /**
-     * @param PhingFile $path
-     * @return void
-     */
-    public function setTargetDir(PhingFile $path)
-    {
-        $this->_targetDir = $path;
-    }
-
-    /**
-     * @return void
-     */
-    protected function _checkTargetDir()
-    {
-        if ($this->_targetDir === null) {
-            throw new BuildException(
-                'Target directory must be specified',
-                $this->location
-            );
-        }
+        return true;
     }
 
 }

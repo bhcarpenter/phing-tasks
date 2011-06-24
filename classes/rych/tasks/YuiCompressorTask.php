@@ -7,6 +7,8 @@
  * @license New BSD License
  */
 
+require_once dirname(__FILE__) . '/ProcessFilesetTask.php';
+
 /**
  * Defines a Phing task to run the YUI compressor against a set of JavaScript
  * or CSS files.
@@ -34,7 +36,7 @@
  * 2.4.2 of the compiled jar file is bundled with this task, however a different
  * jar file may be specified using the optional jarpath attribute.
  */
-class YuiCompressorTask extends Task
+class YuiCompressorTask extends ProcessFilesetTask
 {
 
     /**
@@ -48,16 +50,6 @@ class YuiCompressorTask extends Task
     protected $_jarPath;
 
     /**
-     * @var PhingFile
-     */
-    protected $_targetDir;
-
-    /**
-     * @var array
-     */
-    protected $_fileSets;
-
-    /**
      * @return void
      */
     public function __construct()
@@ -68,15 +60,7 @@ class YuiCompressorTask extends Task
 
         $this->_javaPath = 'java';
         $this->_jarPath = new PhingFile($defaultJarPath);
-        $this->_fileSets = array ();
-    }
-
-    /**
-     * @return boolean
-     */
-    public function init()
-    {
-        return true;
+        parent::__construct();
     }
 
     /**
@@ -85,47 +69,27 @@ class YuiCompressorTask extends Task
     public function main()
     {
         $this->_checkJarPath();
-        $this->_checkTargetDir();
-
-        /* @var $fileSet FileSet */
-        foreach ($this->_fileSets as $fileSet) {
-
-            $files = $fileSet->getDirectoryScanner($this->project)
-                ->getIncludedFiles();
-
-            foreach ($files as $file) {
-
-                $targetDir = new PhingFile($this->_targetDir, dirname($file));
-                if (!$targetDir->exists()) {
-                    $targetDir->mkdirs();
-                }
-                unset ($targetDir);
-
-                $source = new PhingFile($fileSet->getDir($this->project), $file);
-                $target = new PhingFile($this->_targetDir, $file);
-
-                $this->log("Processing ${file}");
-                $cmd = escapeshellcmd($this->_javaPath)
-                    . ' -jar ' . escapeshellarg($this->_jarPath)
-                    . ' -o ' . escapeshellarg($target->getAbsolutePath())
-                    . ' ' . escapeshellarg($source->getAbsolutePath());
-                $this->log('Executing: ' . $cmd, Project::MSG_DEBUG);
-                @exec($cmd, $output, $return);
-
-                if ($return !== 0) {
-                    $this->log("Failed processing ${file}!", Project::MSG_ERR);
-                }
-            }
-        }
+        parent::main();
     }
 
     /**
-     * @return FileSet
+     * Uses the YuiCompressor to compress $source and save the result into
+     * $target
+     *
+     * @param PhingFile $source
+     * @param PhingFile $target
+     * @return bool Whether or not processing the file was successful.
      */
-    public function createFileSet()
+    protected function _process($source, $target) 
     {
-        $num = array_push($this->_fileSets, new FileSet);
-        return $this->_fileSets[$num - 1];
+        $cmd = escapeshellcmd($this->_javaPath)
+            . ' -jar ' . escapeshellarg($this->_jarPath)
+            . ' -o ' . escapeshellarg($target->getAbsolutePath())
+            . ' ' . escapeshellarg($source->getAbsolutePath());
+        $this->log('Executing: ' . $cmd, Project::MSG_DEBUG);
+        @exec($cmd, $output, $return);
+
+        return $return === 0;
     }
 
     /**
@@ -150,28 +114,6 @@ class YuiCompressorTask extends Task
         } else if (!$this->_jarPath->exists()) {
             throw new BuildException(
                 'Unable to locate jar file at specified path',
-                $this->location
-            );
-        }
-    }
-
-    /**
-     * @param PhingFile $path
-     * @return void
-     */
-    public function setTargetDir(PhingFile $path)
-    {
-        $this->_targetDir = $path;
-    }
-
-    /**
-     * @return void
-     */
-    protected function _checkTargetDir()
-    {
-        if ($this->_targetDir === null) {
-            throw new BuildException(
-                'Target directory must be specified',
                 $this->location
             );
         }
